@@ -2,6 +2,7 @@
 'Retrieve data from Y5-210MU 5G Hub'
 'MymsMan, bobbuxton@gmail.com'
 'Inspired by https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py'
+VERSION = '1.0'
 
 import argparse
 import time
@@ -13,7 +14,7 @@ import os
 import requests
 import pprint
 
-# Constants for router login and queries
+# Constants for router login and other actions
 ROUTER_URL = 'https://192.168.0.1'
 LOGIN_ENDPOINT = '/web/v1/user/login'
 REBOOT_ENDPOINT = '/web/v1/setting/system/maintenance/reboot'
@@ -36,7 +37,7 @@ if not LOGPATH== '':
 confighelp= "Current directory"
 if not CONFIGPATH== '':
     confighelp = CONFIGPATH 
-parser = argparse.ArgumentParser(description="Retrieve data from Y5-210MU 5G Hub")
+parser = argparse.ArgumentParser(description=f"Retrieve data from Y5-210MU 5G Hub, {VERSION=}",)
 parser.add_argument("-u","--userid", default=USERNAME, help=f"Hub userid, default={USERNAME}")
 parser.add_argument("-p","--password", default=PASSWORD, help="Hub user password")
 parser.add_argument("-url", default=ROUTER_URL, help=f"Router URL, default={ROUTER_URL}")
@@ -228,11 +229,11 @@ def query_Hub(headers,query):
     return sel_data
 
 
-# Main function that querys hub for each wndpoint and returns requested data items
+# Main function that queries hub for each endpoint and returns requested data items
 def query_all(headers):
-    "Function to query hub for each wndpoint and return requested data items"
+    "Function to query hub for each endpoint and return requested data items"
     global session
-    time.sleep(3) # Hostinfo not always immediately available
+    # time.sleep(3) # Hostinfo not always immediately available
     start=time.perf_counter()
     now=f'{datetime.now()}'
     json_data = {"QueryTime": now}
@@ -305,7 +306,6 @@ def save_logs(headers):
     # Send syslog request
     post_response = session.post(
         f"{args.url}{SYSLOG_ENDPOINT}",
-        timeout=30,
         json={},
         headers=headers,
         verify=False
@@ -334,7 +334,6 @@ def save_config(headers):
     # Send config backup request
     post_response = session.post(
         f"{args.url}{CONFIG_ENDPOINT}",
-        timeout=30,
         json={},
         headers=headers,
         verify=False
