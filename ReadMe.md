@@ -1,52 +1,55 @@
 # 3 (Three) / Greenpacket Outdoor router Y5-210MU Inquiry and Reboot utility
 
-<img src="images/Y5-210MU.png" alt="Alternative text" style="height: 100px;">
-
 ## Summary
 
-The Y5-210MU is a 4G/5G external router created by Greenpacket and supplied by 3 (Three) UK as a home broadband solution along with an Eero 6 internal wireless router.
+The Y5-210MU is a 4G/5G external hub/router created by Greenpacket and supplied by 3 (Three) UK as a home broadband solution along with an Eero 6 internal wireless router.
 
 You can connect to the hub via a web browser and scroll through the numerous information pages and perform various actions but this becomes tedious if you want to automate monitoring the hub regularly.
 
-If you have tried this script and it works for you, or if you have questions/suggestions, please put add a like and/or reply on the comment in this thread https://community.three.co.uk/t5/Broadband/5G-Outdoor-hub-Y5-210MU-connection-Issue/m-p/41466
-
-
+inquirehub makes it easier to automate routine hub monitoring by providing a simple command interface to the hub.
 
 ## Solution
 
 I have tried to pick the most useful fields from the various Hub displays and these are output in three ways:
+
 * Displayed on screen at end of run
 * Appended to a file in CSV format for input to a spreadsheet
-* Returned in JSON format for possible use by another programme
+* Returned in JSON format for possible use by another program
+
 Frankly I don't understand the meanings of many of the acronyms used or the significance of the data presented!
-I have tried to choose fields likely to vary over time rather than configuration constants but if I have missed something significant let me know, or change the query-list configuration to include it
+I have tried to choose fields likely to vary over time rather than configuration constants but if I have missed something significant let me know, or change the query-list configuration (see below) to include it
 
 Other functions included are:
+
 * Download the hubs log file to a local file with timestamped name.
 * Download the hubs configuration data to a local file with timestamped name.
 * Reboot the hub
 
 The script needs to have YOUR username and password for the interface, these can be supplied via the command line or you can customize the script to save the need to enter them each time (see below)
 
-Please give it a try and give feedback.
+Please give it a try and give feedback in [this thread](https://community.three.co.uk/t5/Broadband/5G-Outdoor-hub-Y5-210MU-connection-Issue/m-p/41466)
 
 ## How to run
 
-Ensure Python is installed - I used level 3.13 on Windows 11 but it should run on any machine with Python. 
-On Windows I needed to install the Requests package (`pip install requests`), otherwise the script only needs the standard libraries. 
+Ensure Python is installed - I used level 3.13 on Windows 11 but it should run on any machine with Python.
+On Windows I needed to install the Requests package (`pip install requests`), otherwise the script only needs the standard libraries.
 Ensure that `inquirehub.py` has been added and execute it.
 
 ## Example of execution
 
-```
+```cmd
 ./inquirehub.py
 ```
-or 
-```
+
+or
+
+```cmd
 python ./inquirehub.py
 ```
+
 ### Display command help
-```
+
+```cmd
 python inquirehub.py -h
 usage: inquirehub.py [-h] [-u USERID] [-p PASSWORD] [-url URL] [-f CSVFILE | -nof | --reboot | -l [LOGPATH] |
                      -c [CONFIGPATH]] [-hdr | -nohdr] [-v | -q]
@@ -71,8 +74,10 @@ options:
   -v, --verbose         Show full hub query output
   -q, --quiet           Hide query output
 ```
+
 ### Display selected fields
-```
+
+```cmd
 python inquirehub.py -p password
 
 
@@ -101,10 +106,14 @@ Selected data query_count=8 runtime=0.9514778999146074
  'Ipv6': '',
  'LeaseTime': '08-08-2025 18:16:06'}
 ```
+
 ### Show full output
+
 Note: Full data is NOT written to CSV file or returned in JSON.
 Verbose output is useful when creating customized query-list, even more output available with -vv option
-```
+
+```cmd
+
 python inquirehub.py -p password -v
 Namespace(userid='admin', password='password', url='https://192.168.0.1', CSVfile='./inquirehub.csv', noCSVfile=False, reboot=False, logpath=None, configpath=None, header=False, noHeader=False, verbose=1, quiet=0)
 
@@ -168,39 +177,52 @@ Selected data query_count=48 runtime=7.50000480003655
  'Ipv6': '',
  'LeaseTime': '08-08-2025 18:16:06'}
 ```
+
 ### Download Hub logs
-```
+
+```cmd
 python inquirehub.py -p password -l
 Router syslog initiated successfully at 2025-08-07 21:00:24.506101
 Syslog downloaded to ./syslog250807-2100.tar.gz
 ```
+
 ### Download Hub configuration
-```
+
+```cmd
 python inquirehub.py -p password -c
 Router config backup initiated successfully at 2025-08-07 21:02:33.689270
 Config backup downloaded to ./configbackup250807-2102.tar.gz
 ```
+
 ### Reboot hub
-Note for safety there is no short form of the --reboot option
-```
+
+Note for safety there is no short form of the `--reboot` option
+
+```cmd
 python inquirehub.py -p password --reboot
 Router reboot initiated successfully at 2025-08-07 21:05:21.733668
 ```
+
 ## Customization
+
 The simplest and most likely changes you are likely to want to make are to set the password and the paths for files created.
 Edit the `inquirehub.py` source file and make required changes to the default constants
-```
+
+```python
 # User tailorable constants
 DEFAULT_PATH = './'  # Default path for output files - current directory
 CSVFILE = f'{DEFAULT_PATH}inquirehub.csv'
-LOGPATH = DEFAULT_PATH
+LOGPATH = DEFAULT_PATHS
 CONFIGPATH = DEFAULT_PATH
 USERNAME = 'admin'
 PASSWORD = 'router password'
 ```
+
 ### Advanced customization
+
 Too add/remove entries from the output selection list, find the `query_list` section and edit the key_list for the appropriate endpoints.  Use the verbose output list to find the key names.
-```
+
+```python
 # query_list format: [(name, url-endpoint, key-List),...]
 # key_list format: True - return all values, or
 #                  False - don't inquire  
@@ -222,6 +244,10 @@ query_list = [
 
 ## Scheduling
 
+I use PRTG network monitor to monitor my home network including the internet connection and have automated rebooting the hub when the internet connection is down or pings are too high.
+
+My initial plan was to monitor the json output from inquirehub with PRTG but in practice the output is not really suitable for monitoring by PRTG  so currently I will just use the CSV output to maintain a spreadsheet of hub activity and track the frequency of network disconnections.
+
 On Windows system the task scheduler can be used to run the script at regular intervals while on Linux systems the crontab table can be used.
 
 ## Quirks and limitations
@@ -230,10 +256,11 @@ On Windows system the task scheduler can be used to run the script at regular in
 * The hub sometimes fails to return the hostinfo data, for that reason it is positioned at the end of the selected key list
 * If you set the use Daylight Saving hub option On, it can mess up the WAN_Uptime - it shows an hour longer than actual connection time
 * Looping through arrays is not supported, explicit indexes are needed to select output keys
+* Formats of dates and numbers are not consistent and not always directly usable by spreadsheets and other programs
 
 ## Contributing
 
-This package was inspired by and based upon https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py'
+This package was inspired by and based upon [check_and_reboot.py by gavinmcnair](https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py).
 
 Please raise and issue or a PR if you have improved this.
 

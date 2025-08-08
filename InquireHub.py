@@ -51,7 +51,7 @@ optgroup.add_argument("-c","--config", dest="configpath",  const=CONFIGPATH, nar
 
 hdrgroup = parser.add_mutually_exclusive_group()
 hdrgroup.add_argument("-hdr","--header", action="store_true", help=f"Write CSV header line,\n Default= header if file preexists, noHeader if it doesnt")
-hdrgroup.add_argument("-nohdr","--noHeader", action="store_true", help="Dont write CSV header line")
+hdrgroup.add_argument("-nohdr","--noHeader", action="store_true", help="Don't write CSV header line")
 
 msglvl = parser.add_mutually_exclusive_group()
 msglvl.add_argument("-v","--verbose", action="count", default=0, help="Show full hub query output")
