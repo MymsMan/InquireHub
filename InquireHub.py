@@ -23,11 +23,11 @@ CONFIG_ENDPOINT = '/web/v1/setting/system/maintenance/backupconfig'
 
 # User tailorable constants
 DEFAULT_PATH = './'  # Default path for output files - current directory
-CSVFILE = f'{DEFAULT_PATH}inquirehub.csv'
+CSVFILE = f'{DEFAULT_PATH}InquireHub.csv'
 LOGPATH = DEFAULT_PATH
 CONFIGPATH = DEFAULT_PATH
 USERNAME = 'admin'
-PASSWORD = 'router password'
+PASSWORD = 'router_password'
 CHUNKSIZE = 8192     # Size of chunks to download files in bytes
 
 # Set up command arguments and help text
