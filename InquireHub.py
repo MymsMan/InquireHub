@@ -1,13 +1,15 @@
 #!/usr/bin/python3
-'Retrieve data from Y5-210MU 5G Hub'
+'Retrieve data from Y5-210MU 5G Hub and control Hub'
 'MymsMan, bobbuxton@gmail.com'
-'Inspired by https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py'
-VERSION = '1.0'
+'Master repository: https://github.com/MymsMan/InquireHub'
+'Discussion: https://community.three.co.uk/t5/Broadband/InquireHub-3-Three-Greenpacket-Outdoor-router-Y5-210MU-Inquiry-and-Reboot-utility/m-p/54256#M9488 '
+'Inspired by https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py '
+VERSION = '2.0'
 
 import argparse
 import time
 import socket
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import csv
 import os
@@ -18,8 +20,11 @@ import pprint
 ROUTER_URL = 'https://192.168.0.1'
 LOGIN_ENDPOINT = '/web/v1/user/login'
 REBOOT_ENDPOINT = '/web/v1/setting/system/maintenance/reboot'
+RESET_HUB_ENDPOINT = '/web/v1/setting/system/maintenance/factoryreset'
 SYSLOG_ENDPOINT = '/web/v1/setting/system/syslog/download'
 CONFIG_ENDPOINT = '/web/v1/setting/system/maintenance/backupconfig'
+PING_ENDPOINT = '/web/v1/setting/system/ping'
+CLEARTRAFFIC_ENDPOINT = '/web/v1/setting/network/wan/cleartraffic'
 
 # User tailorable constants
 DEFAULT_PATH = './'  # Default path for output files - current directory
@@ -28,9 +33,12 @@ LOGPATH = DEFAULT_PATH
 CONFIGPATH = DEFAULT_PATH
 USERNAME = 'admin'
 PASSWORD = 'router_password'
+PING_URL = 'www.google.com'
 CHUNKSIZE = 8192     # Size of chunks to download files in bytes
 
 # Set up command arguments and help text
+now=datetime.now(tz=timezone.utc)        
+fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
 loghelp= "Current directory"
 if not LOGPATH== '':
     loghelp = LOGPATH
@@ -38,22 +46,28 @@ confighelp= "Current directory"
 if not CONFIGPATH== '':
     confighelp = CONFIGPATH 
 parser = argparse.ArgumentParser(description=f"Retrieve data from Y5-210MU 5G Hub, {VERSION=}",)
-parser.add_argument("-u","--userid", default=USERNAME, help=f"Hub userid, default={USERNAME}")
-parser.add_argument("-p","--password", default=PASSWORD, help="Hub user password")
-parser.add_argument("-url", default=ROUTER_URL, help=f"Router URL, default={ROUTER_URL}")
 
-optgroup = parser.add_mutually_exclusive_group()
-optgroup.add_argument("-f","--CSVfile", default=CSVFILE, help=f"File for csv output, default={CSVFILE}")
-optgroup.add_argument("-nof","--noCSVfile", action="store_true", help="Don't write CSV output file")
-optgroup.add_argument("--reboot", action="store_true", help="Reboot hub")
-optgroup.add_argument("-l","--log", dest="logpath", const=LOGPATH, nargs='?', help=f"Save logs to logpath, default= {loghelp}")
-optgroup.add_argument("-c","--config", dest="configpath",  const=CONFIGPATH, nargs='?', help=f"Save Configuration to configpath, default={confighelp}")
+functiongroup = parser.add_argument_group('Functions')
+fncgroup = functiongroup.add_mutually_exclusive_group(required=True)
+fncgroup.add_argument("-f","--CSVfile", default=CSVFILE, const=CSVFILE, nargs='?', help=f"Inquire and write CSV file, default={CSVFILE}")
+fncgroup.add_argument("-nof","--noCSVfile", action="store_true", help="Inquire and Don't write CSV file")
+fncgroup.add_argument("-l","--log", dest="logpath", const=LOGPATH, nargs='?', help=f"Save logs to logpath, default= {loghelp}")
+fncgroup.add_argument("-c","--config", dest="configpath",  const=CONFIGPATH, nargs='?', help=f"Save Configuration to configpath, default={confighelp}")
+fncgroup.add_argument("-pi","-ping","--ping", dest="pingURL",  const=PING_URL, nargs='?', help=f"Ping URL from hub, default={PING_URL}")
+fncgroup.add_argument("-rs","--resetStats", action="store_true", help="Reset traffic interval statistics")
+fncgroup.add_argument("--reboot", action="store_true", help="Reboot hub")
+# fncgroup.add_argument("--resetHub", action="store_true", help="Reset hub to factory settings")
 
-hdrgroup = parser.add_mutually_exclusive_group()
+optgroup = parser.add_argument_group('Options')
+optgroup.add_argument("-u","--userid", default=USERNAME, help=f"Hub userid, default={USERNAME}")
+optgroup.add_argument("-p","--password", default=PASSWORD, help="Hub user password")
+optgroup.add_argument("-url", default=ROUTER_URL, help=f"Router URL, default={ROUTER_URL}")
+
+hdrgroup = optgroup.add_mutually_exclusive_group()
 hdrgroup.add_argument("-hdr","--header", action="store_true", help=f"Write CSV header line,\n Default= header if file preexists, noHeader if it doesnt")
-hdrgroup.add_argument("-nohdr","--noHeader", action="store_true", help="Don't write CSV header line")
+hdrgroup.add_argument("-nohdr","--noHeader", action="store_true", help="Don't write CSV header line\n")
 
-msglvl = parser.add_mutually_exclusive_group()
+msglvl = optgroup.add_mutually_exclusive_group()
 msglvl.add_argument("-v","--verbose", action="count", default=0, help="Show full hub query output")
 msglvl.add_argument("-q","--quiet", action="count", default=0, help="Hide query output")
 args = parser.parse_args()
@@ -64,7 +78,7 @@ if args.verbose > 0:
 # key_list format: True - return all values, or
 #                  False - don't inquire  
 #                  []  - return no keys   
-#                  [('key_index','key_name'),...] 
+#                  [("key_index",'key_name'),...] 
 # looping through arrays not (yet) supported, currently need explicit index
 query_list = [
     ('Signal Strength','/web/v1/startup/radiocellsinfo',[
@@ -79,7 +93,7 @@ query_list = [
         ]),
     ('User visibility','/web/v1/startup/webui/visibilityinfo',False), # Who can see what
     ('WAN status','/web/v1/status/wanstatus',[]),
-    ('WAN clear traffic time','/web/v1/setting/network/wan/getlastcleartraffictime',[]),
+    ('WAN clear traffic time','/web/v1/setting/network/wan/getlastcleartraffictime',True),
     ('WAN Traffic','/web/v1/setting/network/wan/gettraffic',True),
     ('Device Info','/web/v1/setting/deviceinfo',[
         ("['RunningTime']",'RunningTime'),
@@ -89,7 +103,7 @@ query_list = [
     ('Port mode','/web/v1/setting/network/lan/portmodeconfig',True),
     ('Wirelesss info','/web/v1/dashboard/wirelessinfo',[]),
     ('Product info','/web/v1/startup/productinfo',[]),
-    ('Internet info','/web/v1/dashboard/internetinfo',[]),
+    ('Internet info','/web/v1/dashboard/internetinfo',True),
     ('Radio Info -Engineer','/web/v1/engineermode/radio/radioparainfo',[]),
     ('Radio NR cell','/web/v1/dashboard/radio/nrcellinfo',[]),
     ('Radio NSA cell','/web/v1/dashboard/radio/nsacellinfo',[]),
@@ -123,7 +137,13 @@ query_list = [
     ('Time Zone List','/web/v1/setting/system/general/timezonelist',False), # List of timezone values
     ('User ids','/web/v1/user/userinfos',[]),
     ('Device Access ','/web/v1/setting/system/devicemanagement/config',[]),
-    ('TR069','/web/v1/setting/system/tr069/config',[]),
+    ('TR069','/web/v1/setting/system/tr069/config',[
+        ("['TR069ServiceEnable']",'TR069ServiceEnable'),
+        ("['PeriodicInformEnable']",'PeriodicInformEnable'),
+        ("['PeriodicInformTime']",'PeriodicInformTime'),
+        ("['PeriodicInformInterval']",'PeriodicInformInterval'),
+        ("['ConnectionRequestUsername']",'ConnectionRequestUsername')
+         ]),
     ('lperf','/web/v1/setting/system/iperf/config',[]),
     ('SMS inbox count','/web/v1/sms/inboxInfo',[
         ("['TotalMsgNum']","SMS_In"),
@@ -180,7 +200,7 @@ def login():
             }
         return headers
     else:
-        print(f"Login failed {login_response.json().get('code')} {login_response.json().get('msg')} at {datetime.now()}.")
+        print(f"Login failed {login_response.json().get('code')} {login_response.json().get('msg')} at {fmtnow}.")
         return False
 
 # Function to issue query to the router and return data
@@ -209,7 +229,7 @@ def query_Hub(headers,query):
         query_json = query_response.json()
         query_data = query_json['data']        
     else:
-        print(f"Failed query {query_name}, {query_endpoint} {query_response.json().get('code')} {query_response.json().get('msg')} at {datetime.now()}.")
+        print(f"Failed query {query_name}, {query_endpoint} {query_response.json().get('code')} {query_response.json().get('msg')} at {fmtnow}.")
         return {}
     if key_list == True:
         sel_data=query_data
@@ -235,8 +255,7 @@ def query_all(headers):
     global session
     # time.sleep(3) # Hostinfo not always immediately available
     start=time.perf_counter()
-    now=f'{datetime.now()}'
-    json_data = {"QueryTime": now}
+    json_data = {"QueryTime": fmtnow}
     
     for query in query_list:
        json_data.update(query_Hub(headers,query))
@@ -267,16 +286,49 @@ def reboot_hub(headers):
     "Function to reboot the hub"
     # Send reboot request
     post_response = session.post(
-        f"{args.url}{REBOOT_ENDPOINT}",
+        f"{args.url}{RESET_HUB_ENDPOINT}",
         headers=headers,
         verify=False
     )
 
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
-        print(f"Router reboot initiated successfully at {datetime.now()}")
+        print(f"Router reset_hub initiated successfully at {fmtnow}")
         return True
     else:
-        print(f"Failed to initiate router reboot {post_response.json().get('msg')} at {datetime.now()}.")
+        print(f"Failed to initiate router reset_hub {post_response.json().get('msg')} at {fmtnow}.")
+    return
+
+
+def reset_hub(headers):
+    "Function to reset the hub"
+    # Send reset_hub request
+    post_response = session.post(
+        f"{args.url}{RESET_HUB_ENDPOINT}",
+        headers=headers,
+        verify=False
+    )
+
+    if post_response.status_code == 200 and post_response.json().get('code') == 200:
+        print(f"Router reset_hub initiated successfully at {fmtnow}")
+        return True
+    else:
+        print(f"Failed to initiate router reset_hub {post_response.json().get('msg')} at {fmtnow}.")
+    return
+
+def reset_stats(headers):
+    "Function to reset traffic statistics for the hub"
+    # Send reset traffic statistics request
+    post_response = session.delete(
+        f"{args.url}{CLEARTRAFFIC_ENDPOINT}",
+        headers=headers,
+        verify=False
+    )
+
+    if post_response.status_code == 200 and post_response.json().get('code') == 200:
+        print(f"Router reset traffic statistics initiated successfully at {fmtnow}")
+        return True
+    else:
+        print(f"Failed to initiate router reset traffic statistics {post_response.json().get('msg')} at {fmtnow}.")
     return
 
 # download file from URL
@@ -312,11 +364,10 @@ def save_logs(headers):
     )
 
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
-        print(f"Router syslog initiated successfully at {datetime.now()}")
+        print(f"Router syslog initiated successfully at {fmtnow}")
         post_json = post_response.json()
         post_data = post_json['data']       
         logurl=post_data['SyslogUrl']
-        now=datetime.now()        
         file = f"{args.logpath}syslog{now.strftime('%y%m%d-%H%M')}.tar.gz"
         dlresult= download_file(headers,logurl,file)
         if dlresult:
@@ -325,8 +376,29 @@ def save_logs(headers):
             print(f"Syslog download to {file} failed")    
         return dlresult
     else:
-        print(f"Failed to initiate syslog download {post_response.json().get('msg')} at {datetime.now()}.")
+        print(f"Failed to initiate syslog download {post_response.json().get('msg')} at {fmtnow}.")
         return False
+    return
+
+def ping_hub(headers):
+    "Function to ping the hub"
+    # Send ping request
+
+    post_response = session.post(
+        f"{args.url}{PING_ENDPOINT}",
+        json={"IpProtocol":"ipv4",
+              "PingAddress":args.pingURL,
+              "PingResult":""},
+        headers=headers,
+        verify=False
+    )
+
+    if post_response.status_code == 200 and post_response.json().get('code') == 200:
+        print(f"Ping to {args.pingURL} at {fmtnow}")
+        print(post_response.json().get("data").get("PingResult"))
+        return post_response.json().get("data").get("PingResult")
+    else:
+        print(f"Failed to ping {args.pingURL} {post_response.json().get('msg')} at {fmtnow}.")
     return
 
 def save_config(headers):
@@ -340,11 +412,10 @@ def save_config(headers):
     )
 
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
-        print(f"Router config backup initiated successfully at {datetime.now()}")
+        print(f"Router config backup initiated successfully at {fmtnow}")
         post_json = post_response.json()
         post_data = post_json['data']       
         configurl=post_data['ConfigUrl']
-        now=datetime.now()        
         file = f"{args.configpath}configbackup{now.strftime('%y%m%d-%H%M')}.tar.gz"
         dlresult= download_file(headers,configurl,file)
         if dlresult:
@@ -353,7 +424,7 @@ def save_config(headers):
             print(f"Config backup download to {file} failed")    
         return dlresult
     else:
-        print(f"Failed to initiate config backup download {post_response.json().get('msg')} at {datetime.now()}.")
+        print(f"Failed to initiate config backup download {post_response.json().get('msg')} at {fmtnow}.")
         return False
     return
 
@@ -365,10 +436,16 @@ def main():
         headers = login()
         if args.reboot:
             return reboot_hub(headers)
+        #elif args.resetHub:
+        #    return reset_hub(headers)
+        elif args.resetStats:
+            return reset_stats(headers)
         elif not args.logpath==None:
             return save_logs(headers)
         elif not args.configpath==None:
             return save_config(headers)
+        elif not args.pingURL==None:
+            return ping_hub(headers)
         else:
             return query_all(headers)  
 
