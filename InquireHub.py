@@ -4,7 +4,7 @@
 'Master repository: https://github.com/MymsMan/InquireHub'
 'Discussion: https://community.three.co.uk/t5/Broadband/InquireHub-3-Three-Greenpacket-Outdoor-router-Y5-210MU-Inquiry-and-Reboot-utility/m-p/54256#M9488 '
 'Inspired by https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py '
-VERSION = '2.0'
+VERSION = '2.1'
 
 import argparse
 import time
@@ -37,7 +37,7 @@ PING_URL = 'www.google.com'
 CHUNKSIZE = 8192     # Size of chunks to download files in bytes
 
 # Set up command arguments and help text
-now=datetime.now(tz=timezone.utc)        
+now=datetime.now()        
 fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
 loghelp= "Current directory"
 if not LOGPATH== '':
@@ -47,10 +47,10 @@ if not CONFIGPATH== '':
     confighelp = CONFIGPATH 
 parser = argparse.ArgumentParser(description=f"Retrieve data from Y5-210MU 5G Hub, {VERSION=}",)
 
-functiongroup = parser.add_argument_group('Functions')
-fncgroup = functiongroup.add_mutually_exclusive_group(required=True)
-fncgroup.add_argument("-f","--CSVfile", default=CSVFILE, const=CSVFILE, nargs='?', help=f"Inquire and write CSV file, default={CSVFILE}")
-fncgroup.add_argument("-nof","--noCSVfile", action="store_true", help="Inquire and Don't write CSV file")
+fncgroup = parser.add_argument_group('Functions',"choose 1 or more functions to run")
+filgroup = fncgroup.add_mutually_exclusive_group(required=False)
+filgroup.add_argument("-f","--CSVfile",  const=CSVFILE, nargs='?', help=f"Inquire and write CSV file, default={CSVFILE}")
+filgroup.add_argument("-nof","--noCSVfile", action="store_true", help="Inquire and Don't write CSV file")
 fncgroup.add_argument("-l","--log", dest="logpath", const=LOGPATH, nargs='?', help=f"Save logs to logpath, default= {loghelp}")
 fncgroup.add_argument("-c","--config", dest="configpath",  const=CONFIGPATH, nargs='?', help=f"Save Configuration to configpath, default={confighelp}")
 fncgroup.add_argument("-pi","-ping","--ping", dest="pingURL",  const=PING_URL, nargs='?', help=f"Ping URL from hub, default={PING_URL}")
@@ -200,6 +200,8 @@ def login():
             }
         return headers
     else:
+        now=datetime.now()        
+        fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
         print(f"Login failed {login_response.json().get('code')} {login_response.json().get('msg')} at {fmtnow}.")
         return False
 
@@ -229,6 +231,8 @@ def query_Hub(headers,query):
         query_json = query_response.json()
         query_data = query_json['data']        
     else:
+        now=datetime.now()       
+        fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
         print(f"Failed query {query_name}, {query_endpoint} {query_response.json().get('code')} {query_response.json().get('msg')} at {fmtnow}.")
         return {}
     if key_list == True:
@@ -255,6 +259,8 @@ def query_all(headers):
     global session
     # time.sleep(3) # Hostinfo not always immediately available
     start=time.perf_counter()
+    now=datetime.now(tz=timezone.utc)     
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
     json_data = {"QueryTime": fmtnow}
     
     for query in query_list:
@@ -290,6 +296,8 @@ def reboot_hub(headers):
         headers=headers,
         verify=False
     )
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
 
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Router reset_hub initiated successfully at {fmtnow}")
@@ -308,6 +316,8 @@ def reset_hub(headers):
         verify=False
     )
 
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Router reset_hub initiated successfully at {fmtnow}")
         return True
@@ -324,6 +334,8 @@ def reset_stats(headers):
         verify=False
     )
 
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Router reset traffic statistics initiated successfully at {fmtnow}")
         return True
@@ -363,6 +375,9 @@ def save_logs(headers):
         verify=False
     )
 
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Router syslog initiated successfully at {fmtnow}")
         post_json = post_response.json()
@@ -393,6 +408,9 @@ def ping_hub(headers):
         verify=False
     )
 
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Ping to {args.pingURL} at {fmtnow}")
         print(post_response.json().get("data").get("PingResult"))
@@ -410,6 +428,9 @@ def save_config(headers):
         headers=headers,
         verify=False
     )
+
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
 
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Router config backup initiated successfully at {fmtnow}")
@@ -432,22 +453,24 @@ def save_config(headers):
 def main():
     "Main function that logs into hub and invokes selected function"
     global session
+    ret =True
     with requests.Session() as session:
         headers = login()
+        if not args.logpath==None:
+            ret = save_logs(headers)
+        if not args.configpath==None:
+            ret = save_config(headers)
+        if not args.pingURL==None:
+            ret = ping_hub(headers)
+        if not args.CSVfile==None or args.noCSVfile:
+            ret = query_all(headers)  
+        if args.resetStats:
+            ret = reset_stats(headers)
         if args.reboot:
-            return reboot_hub(headers)
-        #elif args.resetHub:
-        #    return reset_hub(headers)
-        elif args.resetStats:
-            return reset_stats(headers)
-        elif not args.logpath==None:
-            return save_logs(headers)
-        elif not args.configpath==None:
-            return save_config(headers)
-        elif not args.pingURL==None:
-            return ping_hub(headers)
-        else:
-            return query_all(headers)  
+            ret = reboot_hub(headers)
+        #if args.resetHub:
+        #   ret = reset_hub(headers)
+    return ret    
 
 
 if __name__ == "__main__":

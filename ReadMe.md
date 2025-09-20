@@ -1,8 +1,8 @@
-# 3 (Three) / Greenpacket Outdoor router Y5-210MU Inquiry and Control utility 
+# 3 (Three) / Greenpacket Outdoor router Y5-210MU Inquiry and Control utility
 
-## Latest version 
+## Latest version
 
-Version: 2.0
+Version: 2.1
 
 [GitHub](https://github.com/MymsMan/InquireHub)
 
@@ -66,8 +66,7 @@ python ./InquireHub.py function options
 Typical usage
 
 ```cmd
- python
-  ./inquirehub.py -p password -f
+ python   ./inquirehub.py -p password -f
 
 
 Selected data query_count=11 runtime=0.7654827999940608
@@ -114,16 +113,17 @@ Selected data query_count=11 runtime=0.7654827999940608
 ### Display command help
 
 ```cmd
-python ./inquirehub.py -h
-usage: inquirehub.py [-h] (-f [CSVFILE] | -nof | -l [LOGPATH] | -c [CONFIGPATH] | -pi [PINGURL] | -rs | --reboot) [-u USERID]
-                     [-p PASSWORD] [-url URL] [-hdr | -nohdr] [-v | -q]
+usage: inquirehub.py [-h] [-f [CSVFILE] | -nof] [-l [LOGPATH]] [-c [CONFIGPATH]] [-pi [PINGURL]] [-rs] [--reboot]
+                     [-u USERID] [-p PASSWORD] [-url URL] [-hdr | -nohdr] [-v | -q]
 
-Retrieve data from Y5-210MU 5G Hub, VERSION='2.0'
+Retrieve data from Y5-210MU 5G Hub, VERSION='2.1'
 
 options:
   -h, --help            show this help message and exit
 
 Functions:
+  choose 1 or more functions to run
+
   -f, --CSVfile [CSVFILE]
                         Inquire and write CSV file, default=./InquireHub.csv
   -nof, --noCSVfile     Inquire and Don't write CSV file
@@ -320,7 +320,8 @@ You are welcome to make a copy of the spreadsheet for your own use.
 **Note:** The spreadsheet is tailored to the InquireHub Version 2 csv file format.  **Do not mix formats within the same csv file!**
 
 A simpler version of the spreadsheet for handling the csv files produced by InquireHub Version 1 is also available
-[Google spreadsheet V1](https://docs.google.com/spreadsheets/d/1BobN-CdGVvPEfNaaM9zaNMlmSYRz8VIFHh-pPCh3-MQ/edit?usp=sharing) 
+[Google spreadsheet V1](https://docs.google.com/spreadsheets/d/1BobN-CdGVvPEfNaaM9zaNMlmSYRz8VIFHh-pPCh3-MQ/edit?usp=sharing)
+
 This version will not be updated
 
 ## Quirks and limitations
@@ -353,11 +354,13 @@ This package was inspired by and based upon [check_and_reboot.py by gavinmcnair]
   * Internet info fields
   * TR069 configuration fields
 
+### Version 2.1
+
+* Allow multiple functions on single command invocations
+
 ## Links
 
 * Master repository [GitHub](https://github.com/MymsMan/InquireHub)
 * Feedback [Thread](https://community.three.co.uk/t5/Broadband/InquireHub-3-Three-Greenpacket-Outdoor-router-Y5-210MU-Inquiry-and-Reboot-utility/m-p/54256#M9488)
 * Spreadsheet [Google spreadsheet V2](https://docs.google.com/spreadsheets/d/1ZJ7lzzOdkE776Md00ovYjfUTkANw_M6m7CHw95HHZ-M/edit?usp=sharing)
 * Credit [check_and_reboot.py by gavinmcnair](https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py)
-
-
