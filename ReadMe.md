@@ -2,7 +2,7 @@
 
 ## Latest version
 
-Version: 2.1
+Version: 2.2
 
 [GitHub](https://github.com/MymsMan/InquireHub)
 
@@ -30,12 +30,17 @@ Other functions included are:
 * Download the hubs log file to a local file with timestamped name.
 * Download the hubs configuration data to a local file with timestamped name.
 * Reboot the hub
+* Reset the hub
+* Reset Wifi connection
+* Enable/Disable TR069 remote hub updates
+* Reset traffic statistics
+* Set or disable scheduled reboot interval
 * Ping a web address
 * Clear Traffic statistics
 
 The script needs to have a user name and password to logon to the hub, these can be supplied via the command line or you can customize the script to save the need to enter them each time (see below)
 
-Please give it a try and give feedback in [this thread](https://community.three.co.uk/t5/Broadband/InquireHub-3-Three-Greenpacket-Outdoor-router-Y5-210MU-Inquiry-and-Reboot-utility/m-p/54256#M9488)
+Please give it a try and give feedback via GitHub issues
 
 ## How to run
 
@@ -113,10 +118,11 @@ Selected data query_count=11 runtime=0.7654827999940608
 ### Display command help
 
 ```cmd
-usage: inquirehub.py [-h] [-f [CSVFILE] | -nof] [-l [LOGPATH]] [-c [CONFIGPATH]] [-pi [PINGURL]] [-rs] [--reboot]
-                     [-u USERID] [-p PASSWORD] [-url URL] [-hdr | -nohdr] [-v | -q]
+usage: InquireHub.py [-h] [-f [CSVFILE] | -nof] [-l [LOGPATH]] [-c [CONFIGPATH]] [-pi [PINGURL]] [-rs]
+                     [-sr {0,1,3,7,15,30}] [-tr | +tr] [--reboot] [--resetHub] [--resetWiFi] [-u USERID] [-p PASSWORD]
+                     [-url URL] [-hdr | -nohdr] [-v | -q]
 
-Retrieve data from Y5-210MU 5G Hub, VERSION='2.1'
+Retrieve data from Y5-210MU 5G Hub, VERSION='2.2'
 
 options:
   -h, --help            show this help message and exit
@@ -133,7 +139,13 @@ Functions:
   -pi, -ping, --ping [PINGURL]
                         Ping URL from hub, default=www.google.com
   -rs, --resetStats     Reset traffic interval statistics
+  -sr, --schedReboot {0,1,3,7,15,30}
+                        Change schedreboot interval, 0=disabled
+  -tr, --TR069          Disable TR069 auto updating
+  +tr, ++TR069          Enable TR069 auto updating
   --reboot              Reboot hub
+  --resetHub            Reset hub to factory settings
+  --resetWiFi           Reset WiFi connection
 
 Options:
   -u, --userid USERID   Hub userid, default=admin
@@ -233,13 +245,36 @@ Router config backup initiated successfully at 2025-08-07 21:02:33.689270
 Config backup downloaded to ./configbackup250807-2102.tar.gz
 ```
 
-### Reboot hub
+### Reboot hub / Reset hub / Reset Wifi / Reset statistics
 
-Note for safety there is no short form of the `--reboot` option
+Note for safety there is no short form of the `--reboot`, '--resetHub', '--resetWifi' options
 
 ```cmd
 python InquireHub.py -p password --reboot
 Router reboot initiated successfully at 2025-08-07 21:05:21.733668
+```
+
+### Enable/Disable TR069
+
+TR069 AKA the CPE WAN Management Protocol (CWMP) allows Three to remotely make updates to the hub settings, problems with the servers 
+have been implicated in causing hub crashes an frequent reboots.
+The ability to update the TR069 setting has been removed from the latest Hub web interface but still remains albeit hidden!
+Three do seem to have reduced the underlying problems but I still use this option to disable TR069 during the day but enable it overnight
+
+```cmd
+python InquireHub.py -p password --TR0069
+Set TR069 configuration for the hub initiated successfully at 2026-10-22 12:51:34
+python InquireHub.py -p password +tr
+Set TR069 configuration for the hub initiated successfully at 2026-10-22 12:54:05
+``` 
+
+### Set reboot frequency
+
+Scheduled reboot frequency can be set to 1, 3, 7, 15, 30 day, or 0 to disable automatic reboots
+
+```cmd
+python InquireHub.py -p password -sr 7
+Set schedReboot configuration for the hub initiated successfully at 2026-10-23 14:04:49
 ```
 
 ### Ping website
@@ -311,7 +346,10 @@ On Windows system the task scheduler can be used to run the script at regular in
 To make it easier to view the csv output from InquireHub I have produced a Google spreadsheet
 [Google spreadsheet V2](https://docs.google.com/spreadsheets/d/1ZJ7lzzOdkE776Md00ovYjfUTkANw_M6m7CHw95HHZ-M/edit?usp=sharing)
 
-![Spreadsheet sample](/Images/IH-Spreadsheet.png "Spreadsheet **Summary Data** example")
+**Note:** Spreadsheet has Not been updated to handle changes in traffic statistics output format introduced by firmware update 130.00100.113.039
+
+![Spreadsheet sample](/Images/IH-Spreadsheet.png "Spreadsheet **Summary Data** example")**
+
 
 Instructions for use are on the "Introduction" sheet of the spreadsheet, Data is loaded by using "Import file" on the **Raw** sheet, the reformatted data is shown on the **Format** sheet and Summarised results on the **Summary Data** sheet
 
@@ -357,6 +395,17 @@ This package was inspired by and based upon [check_and_reboot.py by gavinmcnair]
 ### Version 2.1
 
 * Allow multiple functions on single command invocations
+
+### Version 2.2
+
+Added new functions:
+* Reboot the hub
+* Reset the hub
+* Reset Wifi connection
+* Enable/Disable TR069 remote hub updates
+* Reset traffic statistics
+* Set or disable scheduled reboot interval
+
 
 ## Links
 

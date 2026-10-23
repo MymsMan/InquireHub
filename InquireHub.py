@@ -4,7 +4,7 @@
 'Master repository: https://github.com/MymsMan/InquireHub'
 'Discussion: https://community.three.co.uk/t5/Broadband/InquireHub-3-Three-Greenpacket-Outdoor-router-Y5-210MU-Inquiry-and-Reboot-utility/m-p/54256#M9488 '
 'Inspired by https://github.com/gavinmcnair/Y5-210MU-restarter/blob/main/check_and_reboot.py '
-VERSION = '2.1'
+VERSION = '2.2'
 
 import argparse
 import time
@@ -17,16 +17,20 @@ import requests
 import pprint
 
 # Constants for router login and other actions
-ROUTER_URL = 'https://192.168.0.1'
 LOGIN_ENDPOINT = '/web/v1/user/login'
 REBOOT_ENDPOINT = '/web/v1/setting/system/maintenance/reboot'
 RESET_HUB_ENDPOINT = '/web/v1/setting/system/maintenance/factoryreset'
+RESET_WIFI_ENDPOINT = '/web/v1/setting/network/apn/multi'
 SYSLOG_ENDPOINT = '/web/v1/setting/system/syslog/download'
 CONFIG_ENDPOINT = '/web/v1/setting/system/maintenance/backupconfig'
 PING_ENDPOINT = '/web/v1/setting/system/ping'
 CLEARTRAFFIC_ENDPOINT = '/web/v1/setting/network/wan/cleartraffic'
+TR069_ENDPOINT = '/web/v1/setting/system/tr069/config'
+S_REBOOT_ENDPOINT = '/web/v1/setting/system/maintenance/scheduledreboot/config'
+S_REBOOT_CHOICES= [ "0", "1", "3", "7", "15", "30" ]
 
 # User tailorable constants
+ROUTER_URL = 'https://192.168.0.1'
 DEFAULT_PATH = './'  # Default path for output files - current directory
 CSVFILE = f'{DEFAULT_PATH}InquireHub.csv'
 LOGPATH = DEFAULT_PATH
@@ -45,7 +49,7 @@ if not LOGPATH== '':
 confighelp= "Current directory"
 if not CONFIGPATH== '':
     confighelp = CONFIGPATH 
-parser = argparse.ArgumentParser(description=f"Retrieve data from Y5-210MU 5G Hub, {VERSION=}",)
+parser = argparse.ArgumentParser(description=f"Retrieve data from Y5-210MU 5G Hub, {VERSION=}",prefix_chars='-+')
 
 fncgroup = parser.add_argument_group('Functions',"choose 1 or more functions to run")
 filgroup = fncgroup.add_mutually_exclusive_group(required=False)
@@ -55,8 +59,13 @@ fncgroup.add_argument("-l","--log", dest="logpath", const=LOGPATH, nargs='?', he
 fncgroup.add_argument("-c","--config", dest="configpath",  const=CONFIGPATH, nargs='?', help=f"Save Configuration to configpath, default={confighelp}")
 fncgroup.add_argument("-pi","-ping","--ping", dest="pingURL",  const=PING_URL, nargs='?', help=f"Ping URL from hub, default={PING_URL}")
 fncgroup.add_argument("-rs","--resetStats", action="store_true", help="Reset traffic interval statistics")
+fncgroup.add_argument("-sr","--schedReboot", dest="SRintvl", choices=S_REBOOT_CHOICES, help="Change schedreboot interval,  0=disabled ")
+tr69group = fncgroup.add_mutually_exclusive_group(required=False)
+tr69group.add_argument("-tr","--TR069", action="store_const", const="Disable", help="Disable TR069 auto updating")
+tr69group.add_argument("+tr","++TR069", action="store_const", const="Enable", help="Enable TR069 auto updating")
 fncgroup.add_argument("--reboot", action="store_true", help="Reboot hub")
-# fncgroup.add_argument("--resetHub", action="store_true", help="Reset hub to factory settings")
+fncgroup.add_argument("--resetHub", action="store_true", help="Reset hub to factory settings")
+fncgroup.add_argument("--resetWiFi", action="store_true", help="Reset WiFi connection")
 
 optgroup = parser.add_argument_group('Options')
 optgroup.add_argument("-u","--userid", default=USERNAME, help=f"Hub userid, default={USERNAME}")
@@ -292,18 +301,19 @@ def reboot_hub(headers):
     "Function to reboot the hub"
     # Send reboot request
     post_response = session.post(
-        f"{args.url}{RESET_HUB_ENDPOINT}",
+        f"{args.url}{REBOOT_ENDPOINT}",
         headers=headers,
         verify=False
     )
     now=datetime.now()        
     fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+    print("Allow up to 5 minutes for reboot to complete before logging in again")
 
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
-        print(f"Router reset_hub initiated successfully at {fmtnow}")
+        print(f"Router reboot_hub initiated successfully at {fmtnow}")
         return True
     else:
-        print(f"Failed to initiate router reset_hub {post_response.json().get('msg')} at {fmtnow}.")
+        print(f"Failed to initiate router reboot_hub {post_response.json().get('msg')} at {fmtnow}.")
     return
 
 
@@ -318,6 +328,10 @@ def reset_hub(headers):
 
     now=datetime.now()        
     fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+    print("Warning: Hub will reset to factory settings, all configuration will be lost!")
+    print("Allow up to 5 minutes for reset to complete before logging in again")
+    print("Remember to logon to hub to reset password and reconfigure hub")
+    time.sleep(15)  # Wait for 15 sec
     if post_response.status_code == 200 and post_response.json().get('code') == 200:
         print(f"Router reset_hub initiated successfully at {fmtnow}")
         return True
@@ -341,6 +355,147 @@ def reset_stats(headers):
         return True
     else:
         print(f"Failed to initiate router reset traffic statistics {post_response.json().get('msg')} at {fmtnow}.")
+    return
+
+def reset_WiFi(headers):
+    "Function to reset WiFi connection for the hub"
+     # Send query request
+    query_response = session.get(
+        f"{args.url}{RESET_WIFI_ENDPOINT}",
+        headers=headers,
+        verify=False
+    )
+
+    if query_response.status_code == 200 and query_response.json().get('code') == 200:
+        query_json = query_response.json()
+        query_data = query_json['data']        
+    else:
+        print(f"Failed to get current Wifi configuration {query_response.json().get('code')} {query_response.json().get('msg')} at {fmtnow}.")
+        return False
+    
+    # Prepare reset WiFi connection JSON
+    query_data["Items"][0]["editIndex"] = 0
+    query_data["Items"][0]["OperateType"] = "update"
+
+    if args.verbose > 0:            
+        print(f"Current WiFi configuration")  
+        pprint.pp(query_data)    
+    
+    # Send reset WiFi connection request
+    post_response = session.delete(
+        f"{args.url}{RESET_WIFI_ENDPOINT}",
+        headers=headers,
+        json=query_data,
+        verify=False
+    )
+
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+    if post_response.status_code == 200 and post_response.json().get('code') == 200:
+        print(f"Router reset WiFi connection initiated successfully at {fmtnow}")
+        return True
+    else:
+        print(f"Failed to initiate reset WiFi connection {post_response.json().get('msg')} at {fmtnow}.")
+    return
+
+def set_TR069(headers,action):
+    "Function to set TR069 configuration for the hub"
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Send query request
+    query_response = session.get(
+        f"{args.url}{TR069_ENDPOINT}",
+        headers=headers,
+        verify=False
+    )
+
+    if query_response.status_code == 200 and query_response.json().get('code') == 200:
+        query_json = query_response.json()
+        query_data = query_json['data']        
+    else:
+        print(f"Failed to get current TR069 configuration {query_response.json().get('code')} {query_response.json().get('msg')} at {fmtnow}.")
+        return False
+    
+    if args.verbose > 0:            
+        print(f"Current TR069 configuration")  
+        pprint.pp(query_data)
+
+    # Modify TR069 settings
+    query_data['TR069ServiceEnable'] =action
+    query_data['PeriodicInformEnable'] = action
+    #query_data['ConnectionRequestUsername'] = 'iva-lid'
+    #query_data['ConnectionRequestPassword'] = 'iva-lid'
+
+    # Send set TR069 request
+    post_response = session.post(
+        f"{args.url}{TR069_ENDPOINT}",
+        json=query_data,
+        headers=headers,
+        verify=False
+    )
+    if post_response.status_code == 200 and post_response.json().get('code') == 400:
+        print(f"TR069 update failed, retry resetting connection credentials at {fmtnow}")
+        cruid = query_data.pop('ConnectionRequestUsername')
+        crpwd = query_data.pop('ConnectionRequestPassword')
+        post_response = session.post(
+            f"{args.url}{TR069_ENDPOINT}",
+            json=query_data,
+            headers=headers,
+            verify=False
+        )
+
+    if post_response.status_code == 200 and post_response.json().get('code') == 200:
+        print(f"Set TR069 configuration for the hub initiated successfully at {fmtnow}")
+        return True
+    else:
+        print(f"Failed to initiate set TR069 configuration for the hub {post_response.json().get('msg')} at {fmtnow}.")
+    return
+
+
+def set_schedReboot(headers,interval):
+    "Function to set schedReboot configuration for the hub"
+    now=datetime.now()        
+    fmtnow = now.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Send query request
+    query_response = session.get(
+        f"{args.url}{S_REBOOT_ENDPOINT}",
+        headers=headers,
+        verify=False
+    )
+
+    if query_response.status_code == 200 and query_response.json().get('code') == 200:
+        query_json = query_response.json()
+        query_data = query_json['data']        
+    else:
+        print(f"Failed to get current schedReboot configuration {query_response.json().get('code')} {query_response.json().get('msg')} at {fmtnow}.")
+        return False
+    
+    if args.verbose > 0:            
+        print(f"Current schedReboot configuration")  
+        pprint.pp(query_data)
+
+    # Modify schedReboot settings
+    if interval == "0":
+        query_data['Status'] = 'Disable'
+    else:
+        query_data['Status'] = 'Enable'
+        query_data['Period'] = interval
+
+    # Send set schedReboot request
+    post_response = session.post(
+        f"{args.url}{S_REBOOT_ENDPOINT}",
+        json=query_data,
+        headers=headers,
+        verify=False
+    )
+
+    if post_response.status_code == 200 and post_response.json().get('code') == 200:
+        print(f"Set schedReboot configuration for the hub initiated successfully at {fmtnow}")
+        return True
+    else:
+        print(f"Failed to initiate set schedReboot configuration for the hub {post_response.json().get('msg')} at {fmtnow}.")
     return
 
 # download file from URL
@@ -462,14 +617,20 @@ def main():
             ret = save_config(headers)
         if not args.pingURL==None:
             ret = ping_hub(headers)
+        if not args.SRintvl==None:
+            ret = set_schedReboot(headers,args.SRintvl)
+        if not args.TR069==None:
+            ret = set_TR069(headers,args.TR069)
         if not args.CSVfile==None or args.noCSVfile:
             ret = query_all(headers)  
+        if args.resetWiFi:
+            ret = reset_WiFi(headers)
         if args.resetStats:
             ret = reset_stats(headers)
         if args.reboot:
             ret = reboot_hub(headers)
-        #if args.resetHub:
-        #   ret = reset_hub(headers)
+        if args.resetHub:
+           ret = reset_hub(headers)
     return ret    
 
 
