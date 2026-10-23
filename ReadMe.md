@@ -152,7 +152,7 @@ Options:
   -p, --password PASSWORD
                         Hub user password
   -url URL              Router URL, default=https://192.168.0.1
-  -hdr, --header        Write CSV header line, Default= header if file preexists, noHeader if it doesnt
+  -hdr, --header        Write CSV header line, Default= noHeader if file preexists, header if it doesnt
   -nohdr, --noHeader    Don't write CSV header line
   -v, --verbose         Show full hub query output
   -q, --quiet           Hide query output

@@ -73,7 +73,7 @@ optgroup.add_argument("-p","--password", default=PASSWORD, help="Hub user passwo
 optgroup.add_argument("-url", default=ROUTER_URL, help=f"Router URL, default={ROUTER_URL}")
 
 hdrgroup = optgroup.add_mutually_exclusive_group()
-hdrgroup.add_argument("-hdr","--header", action="store_true", help=f"Write CSV header line,\n Default= header if file preexists, noHeader if it doesnt")
+hdrgroup.add_argument("-hdr","--header", action="store_true", help=f"Write CSV header line,\n Default= noHeader if file preexists, Header if it doesnt")
 hdrgroup.add_argument("-nohdr","--noHeader", action="store_true", help="Don't write CSV header line\n")
 
 msglvl = optgroup.add_mutually_exclusive_group()
